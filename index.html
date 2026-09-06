@@ -647,7 +647,7 @@ var API_URL = "https://script.google.com/macros/s/AKfycbz3DFbcY26uS29qKilR9hP18s
         }
 
         var timer = setTimeout(function () {
-          fail('Apps Script did not answer within 20 seconds. It may be waking up — try Refresh once.');
+          fail(READS[fn] ? 'Apps Script did not answer within 20 seconds. Try Refresh.' : 'Save outcome is unknown: the server may still finish. Close this form and Refresh to check before trying again.');
         }, TIMEOUT_MS);
 
         var p = READS[fn]
@@ -772,7 +772,12 @@ window.PEOPLE = (function () {
     return out;
   }
 
-  return { roster: ROSTER, resolve: resolve, isVendor: isVendor,
+  function setRoster(rows) {
+    ROSTER.splice.apply(ROSTER, [0, ROSTER.length].concat(rows));
+    byAlias = {};
+    ROSTER.forEach(function(p){ p.aliases.forEach(function(a){ byAlias[a.toLowerCase()] = p; }); byAlias[p.name.toLowerCase()] = p; });
+  }
+  return { roster: ROSTER, setRoster: setRoster, resolve: resolve, isVendor: isVendor,
            vendors: VENDORS, ownerOptions: ownerOptions };
 })();
 </script>
@@ -946,7 +951,7 @@ window.PCBForm = (function () {
       var v = (b.stages && b.stages[s[0]]) || {};
       var here = cur === s[2];
       var own = v.owner || (isNew ? usual(L, s[0]) : '');
-      var st = v.status || 'NA';
+      var st = v.status || (isNew && own ? 'Not Started' : 'NA');
       return '<tr data-s="' + esc(st) + '" data-row="' + s[0] + '"' + (here ? ' class="here"' : '') + '>' +
         '<td class="snc"><div class="sn">' + s[3] + '</div></td>' +
         '<td class="nm">' + esc(s[1]) + '</td>' +
@@ -1053,7 +1058,7 @@ window.PCBForm = (function () {
     }
     /** Naming an owner on a stage still sitting at NA starts it, so a stage is
      *  never left assigned-but-not-applicable by accident. */
-    el.addEventListener('change', function(ev){
+    el.onchange = function(ev){
       var n = ev.target;
       if (window.S) S.dirty = true;
       if (n.getAttribute && n.getAttribute('data-k') === 'owner' && n.value.trim()) {
@@ -1065,10 +1070,10 @@ window.PCBForm = (function () {
         if (s2 && s2.value !== 'Completed') s2.value = 'Completed';
       }
       paint();
-    });
+    };
 
     /** Review done — marks the stage Completed and stamps today as its EDA. */
-    el.addEventListener('click', function(ev){
+    el.onclick = function(ev){
       var btn = ev.target.closest('[data-done]');
       if (!btn) return;
       ev.preventDefault();
@@ -1079,8 +1084,9 @@ window.PCBForm = (function () {
       if (eda && !eda.value) eda.value = todayISO();
       paint();
       msg.className = 'msg';
+      if (window.S) S.dirty = true;
       msg.textContent = 'Marked done — press Save changes to write it to the sheet.';
-    });
+    };
 
     paint();
 
@@ -1120,9 +1126,9 @@ window.PCBForm = (function () {
         var stage = $('pf-re').value;
         if (!stage) { msg.className = 'msg bad'; msg.textContent = 'Pick the stage the board re-enters at.'; return; }
         run('respinBoard', {
-          project: b.project, reentry: stage, reason: $('pf-rr').value,
-          raised: new Date().toISOString().slice(0, 10),
-          comment: (el.querySelector('input[data-k="comment"][data-s="' + b.current + '"]') || {}).value || ''
+          project: b.project, stamp: b.stamp || '', reentry: stage, reason: $('pf-rr').value,
+          raised: todayISO(),
+          comment: (el.querySelector('input[data-k="comment"][data-s="' + ((STAGES.find(function(s){return s[2] === stage;}) || [])[0]) + '"]') || {}).value || ''
         }, 'Sending back to Active…');
       });
     }
@@ -1189,11 +1195,13 @@ function splitRows(list, key){
 
 /* ------------------------------------------------------------------ load */
 
+var loadSequence = 0;
 function load(){
+  var sequence = ++loadSequence;
   $('hdr-meta').textContent = 'Reading the sheet…';
-  if (window.PRELOADED) { return receive(window.PRELOADED); }
+  if (window.PRELOADED) { var initial = window.PRELOADED; window.PRELOADED = null; return receive(initial); }
   google.script.run
-    .withSuccessHandler(receive)
+    .withSuccessHandler(function(data){ if (sequence === loadSequence) receive(data); })
     .withFailureHandler(function(err){
       var m = (err && err.message) ? err.message : 'Check that the COMPLETED and ACTIVE tabs still exist.';
       $('list').innerHTML =
@@ -1208,6 +1216,8 @@ function load(){
 function receive(data){
   S.boards = data.boards || [];
   S.lists = data.lists || {};
+  if (Array.isArray(data.employees)) PEOPLE.setRoster(data.employees);
+  var stale = $('stale'); if (stale) stale.remove();
   if (typeof data.ver === 'number') S.ver = data.ver;
   S.dirty = false;
   var t = new Date(data.fetched || Date.now());
@@ -1879,6 +1889,8 @@ function showPerson(name){
  * "Review done" straight from the sidebar: sets the stage to Completed with
  * today as its EDA and writes it, so a finished stage takes one click.
  */
+function localTodayISO(){ var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
 function markDone(project, stageKey){
   var b = S.boards.filter(function(x){ return x.project === project; })[0];
   if (!b) return;
@@ -1892,15 +1904,18 @@ function markDone(project, stageKey){
                      eda: v.eda || '', comment: v.comment || '' };
   });
   stages[stageKey].status = 'Completed';
-  if (!stages[stageKey].eda) stages[stageKey].eda = new Date().toISOString().slice(0, 10);
+  if (!stages[stageKey].eda) stages[stageKey].eda = localTodayISO();
 
   var btn = document.querySelector('#panel-b [data-done="' + stageKey + '"][data-board]');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   google.script.run
-    .withSuccessHandler(function(){ load(); closePanel(); })
+    .withSuccessHandler(function(res){
+      if (res && res.conflict) { if (btn) { btn.disabled = false; btn.textContent = 'Review done'; } alert(res.message); return; }
+      load(); closePanel();
+    })
     .withFailureHandler(function(err){
       if (btn) { btn.disabled = false; btn.textContent = 'Review done'; }
-      alert(err && err.message ? err.message : 'Could not save that. Nothing was changed.');
+      alert(err && err.message ? err.message : 'Could not confirm the save. Refresh to check the board before retrying.');
     })
     .saveBoard({
       project: b.project, customer: b.customer, projectName: b.projectName || '',
@@ -1953,7 +1968,7 @@ function showBoard(project){
 }
 
 function openModal(){ $('modal').classList.add('on'); S.mode = 'edit'; }
-function closeModal(){ $('modal').classList.remove('on'); S.mode = 'view'; $('modal-b').innerHTML = ''; }
+function closeModal(){ $('modal').classList.remove('on'); S.mode = 'view'; S.dirty = false; $('modal-b').innerHTML = ''; poll(); }
 
 function showForm(board){
   $('modal-title').textContent = board ? 'Edit this board — ' + board.project : 'New board';
@@ -2081,7 +2096,7 @@ window.addEventListener('error', function (ev) {
 });
 
 load();
-if (!window.PRELOADED) setInterval(poll, 15000);
+setInterval(poll, 15000);
 </script>
 </body>
 </html>
