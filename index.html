@@ -191,12 +191,18 @@ button,input,select,textarea{font:inherit;color:inherit}
 .stbl input:focus,.stbl select:focus{border-color:var(--focus);outline:none}
 .tbl-wrap{overflow-x:auto;margin-top:4px;-webkit-overflow-scrolling:touch}
 .tbl-wrap .stbl{min-width:100%}
-.stbl td.snc,.stbl th.snc{position:sticky;left:0;background:var(--card);z-index:2}
-.stbl td.nm,.stbl th.nm{position:sticky;left:46px;background:var(--card);z-index:2;
+.tbl-wrap{position:relative;isolation:isolate}
+.stbl td.snc,.stbl th.snc{position:sticky;left:0;background:var(--card);z-index:1}
+.stbl td.nm,.stbl th.nm{position:sticky;left:46px;background:var(--card);z-index:1;
                         box-shadow:1px 0 0 var(--soft)}
 .stbl tr.here td.snc,.stbl tr.here td.nm{background:#F4F7FB}
-.stbl input,.stbl select{min-width:96px}
-.stbl td.cmt-cell input{min-width:150px}
+.stbl select[data-k="owner"]{min-width:158px}
+.stbl select[data-k="status"]{min-width:136px}
+.stbl input[type="date"]{min-width:146px}
+.stbl input,.stbl select{min-width:104px}
+.stbl td.cmt-cell input{min-width:190px}
+.stbl th,.stbl td{white-space:nowrap}
+.stbl td.cmt-cell,.stbl th.cmt-cell{white-space:normal}
 
 /* ------------------------------------------------------------ modal popup */
 .modal{position:fixed;inset:0;display:none;z-index:70;align-items:flex-start;justify-content:center;
@@ -283,6 +289,9 @@ input.field{min-width:230px}
 .grp.sub>.grp-h .caret{width:6px;height:6px}
 .grp.sub>.grp-body{border-top:1px solid var(--soft)}
 .grp-loose{border-top:1px solid var(--soft)}
+.done-sep{padding:7px 16px 7px 32px;background:#F4F6F8;border-top:1px solid var(--rule);
+  border-bottom:1px solid var(--rule);font-size:11.5px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted)}
 .grp.open .grp-body{display:block}
 
 /* ------------------------------------------------------------ board rows */
@@ -465,12 +474,13 @@ input.field{min-width:230px}
 .modal{position:fixed;inset:0;z-index:80;display:none;align-items:flex-start;justify-content:center;
        padding:34px 18px;overflow:auto;background:rgba(18,28,40,.45)}
 .modal.on{display:flex}
-.modal-box{background:var(--card);border-radius:11px;width:min(1020px,100%);
-           box-shadow:0 18px 48px rgba(12,21,33,.28);display:flex;flex-direction:column;max-height:100%}
+.modal-box{background:var(--card);border-radius:11px;width:min(1180px,100%);
+           box-shadow:0 18px 48px rgba(12,21,33,.28);display:flex;flex-direction:column;
+           max-height:calc(100vh - 68px);overflow:hidden}
 .modal-h{padding:18px 24px 15px;border-bottom:1px solid var(--rule);display:flex;gap:14px;align-items:flex-start}
 .modal-h h3{margin:0;font-size:19px;font-weight:600}
 .modal-h .meta{margin-top:2px}
-.modal-b{padding:20px 24px 24px;overflow:auto}
+.modal-b{padding:20px 24px 24px;overflow:auto;flex:1;min-height:0}
 .modal-f{padding:14px 24px;border-top:1px solid var(--rule);background:#FAFBFC;
          display:flex;gap:9px;align-items:center;border-radius:0 0 11px 11px}
 
@@ -495,7 +505,7 @@ input.field{min-width:230px}
 
 <header class="top">
   <div class="top-in">
-    <div class="mark">PCB Tracker <span class="build">BUILD 6</span> <span id="hdr-count"></span></div>
+    <div class="mark">PCB Tracker <span class="build">BUILD 8</span> <span id="hdr-count"></span></div>
     <div class="meta" id="hdr-meta">Loading…</div>
     <div class="top-act">
       <button class="btn btn-quiet" id="btn-refresh">Refresh</button>
@@ -581,7 +591,7 @@ input.field{min-width:230px}
    GitHub Pages bridge. The Apps Script URL is already filled in.
    Change it only if you create a NEW deployment (not a new version).
    =================================================================== */
-var API_URL = "https://script.google.com/macros/s/AKfycbylTbatayRgmOTrxv757BXjmp1JoH-99Pc6JNcslWlb-Ud8L2r82LscDrFNQ7lQ6acwsw/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbz3DFbcY26uS29qKilR9hP18so4kIz1M38XEgtT8qTUqGrOvZCjmNabyTaCd89Jf_1X/exec";
 
 /* Recreates google.script.run over plain web requests, and explains in
    plain English when something is misconfigured. Do not edit below. */
@@ -1121,7 +1131,7 @@ window.PCBForm = (function () {
 
 
 <script>
-var S = { boards: [], lists: {}, ver: -1, dirty: false, proj: '', tab: 'boards', people: {}, q: '', cust: '', stage: '', filter: 'active', open: {}, sel: null, mode: 'view' };
+var S = { boards: [], lists: {}, ver: -1, dirty: false, proj: '', tab: 'boards', people: {}, q: '', cust: '', stage: '', filter: 'all', open: {}, sel: null, mode: 'view' };
 
 var STAGES = PCBForm.STAGES;                       // [key, short, full] — process order
 var CLOSED = { 'Completed': 1, 'NA': 1, 'Cancelled': 1 };
@@ -1138,6 +1148,33 @@ function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c
 function $(id){ return document.getElementById(id); }
 function lateDays(b){ return typeof b.delay === 'number' && b.delay > 0 ? b.delay : 0; }
 function isActive(b){ return b.overall !== 'Completed' && b.overall !== 'Cancelled'; }
+
+/* Active work first, closed work underneath it — inside every client and
+   every project, so one group shows the whole picture. */
+function activeFirst(list){
+  return list.slice().sort(function(a, b){
+    var d = (isActive(a) ? 0 : 1) - (isActive(b) ? 0 : 1);
+    if (d) return d;
+    var la = lateDays(a) || 0, lb = lateDays(b) || 0;
+    if (la !== lb) return lb - la;
+    return String(a.project).localeCompare(String(b.project));
+  });
+}
+
+/* Renders a list with a divider where the closed boards begin. */
+function splitRows(list){
+  var ordered = activeFirst(list);
+  var out = '', shown = false;
+  ordered.forEach(function(b){
+    if (!isActive(b) && !shown) {
+      shown = true;
+      var k = ordered.filter(function(x){ return !isActive(x); }).length;
+      out += '<div class="done-sep">Completed &middot; ' + k + ' board' + (k === 1 ? '' : 's') + '</div>';
+    }
+    out += rowHtml(b);
+  });
+  return out;
+}
 
 /* ------------------------------------------------------------------ load */
 
@@ -1314,7 +1351,7 @@ function render(){
     var hold = g.filter(function(b){ return b.overall === 'On Hold'; }).length;
     var wip  = g.filter(function(b){ return b.overall === 'In Progress'; }).length;
     var gkey = keyPrefix + ':' + name;
-    var open = S.open[gkey] === true || (openByDefault && forced && S.open[gkey] !== false);
+    var open = S.open[gkey] === true || (forced && S.open[gkey] !== false);
     return '<section class="grp' + (open ? ' open' : '') + '" data-g="' + esc(gkey) +
              '" style="--accent:' + accent(name) + '">' +
       '<button class="grp-h"><span class="caret"></span><span class="grp-dot"></span>' +
@@ -1339,7 +1376,7 @@ function render(){
       (byP[p] = byP[p] || []).push(b);
     });
     var pnames = Object.keys(byP).sort();
-    if (!pnames.length) return g.map(rowHtml).join('');
+    if (!pnames.length) return splitRows(g);
 
     var out = pnames.map(function(p){
       var sub  = byP[p];
@@ -1357,11 +1394,11 @@ function render(){
             (hold ? '<span class="tag hold">' + hold + ' on hold</span>' : '') +
             (late ? '<span class="tag late">' + late + ' past due</span>' : '') +
           '</span></button>' +
-        '<div class="grp-body">' + sub.map(rowHtml).join('') + '</div>' +
+        '<div class="grp-body">' + splitRows(sub) + '</div>' +
       '</section>';
     }).join('');
 
-    if (loose.length) out += '<div class="grp-loose">' + loose.map(rowHtml).join('') + '</div>';
+    if (loose.length) out += '<div class="grp-loose">' + splitRows(loose) + '</div>';
     return out;
   }
 
