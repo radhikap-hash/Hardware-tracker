@@ -53,6 +53,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .tab-btn:hover{color:var(--ink)}
 .tab-btn.on{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
 .tab-lead{font-size:13.5px;color:var(--muted);margin:16px 0 4px}
+.build{display:inline-block;vertical-align:2px;margin-left:7px;padding:2px 7px;
+  border-radius:4px;background:#8B5573;color:#fff;font-size:10.5px;font-weight:700;
+  letter-spacing:.07em}
 .pane{display:none}
 .pane.on{display:block}
 .hgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:11px;margin:14px 0 4px}
@@ -492,7 +495,7 @@ input.field{min-width:230px}
 
 <header class="top">
   <div class="top-in">
-    <div class="mark">PCB Tracker <span id="hdr-count"></span></div>
+    <div class="mark">PCB Tracker <span class="build">BUILD 6</span> <span id="hdr-count"></span></div>
     <div class="meta" id="hdr-meta">Loading…</div>
     <div class="top-act">
       <button class="btn btn-quiet" id="btn-refresh">Refresh</button>
@@ -1144,14 +1147,9 @@ function load(){
   google.script.run
     .withSuccessHandler(receive)
     .withFailureHandler(function(err){
-      var m = (err && err.message) ? err.message : 'Unknown error.';
-      $('list').innerHTML =
-        '<div class="empty" style="text-align:left;white-space:pre-wrap;line-height:1.55">' +
-          '<b style="display:block;margin-bottom:8px">Could not read the sheet</b>' +
-          esc(m) +
-        '</div>';
+      $('list').innerHTML = '<div class="empty"><b>Could not read the sheet</b>' +
+        esc(err && err.message ? err.message : 'Check that the COMPLETED and ACTIVE tabs still exist.') + '</div>';
       $('hdr-meta').textContent = 'Not connected';
-      $('hdr-count').textContent = '';
     })
     .getBoards();
 }
@@ -2019,17 +2017,6 @@ function removeBoard(project){
     .withFailureHandler(function(err){ alert(err && err.message ? err.message : 'Could not delete that.'); })
     .deleteBoard({ project: project, stamp: b.stamp || '' });
 }
-
-window.addEventListener('error', function (ev) {
-  var el = document.getElementById('list');
-  if (!el || el.getAttribute('data-errored')) return;
-  el.setAttribute('data-errored', '1');
-  el.innerHTML = '<div class="empty" style="text-align:left;white-space:pre-wrap">' +
-    '<b style="display:block;margin-bottom:8px">The page hit an error</b>' +
-    esc(ev.message || String(ev.error || 'unknown')) + '</div>';
-  var hm = document.getElementById('hdr-meta');
-  if (hm) hm.textContent = 'Not connected';
-});
 
 load();
 if (!window.PRELOADED) setInterval(poll, 15000);
