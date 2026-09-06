@@ -270,6 +270,16 @@ input.field{min-width:230px}
 .tag.hold{background:var(--hold-bg);color:var(--hold)}
 .tag.wip{background:var(--wip-bg);color:var(--wip)}
 .grp-body{display:none;border-top:1px solid var(--soft)}
+/* second tier: Project, nested inside the Client group */
+.grp.sub{border:0;border-radius:0;margin:0;background:transparent;
+  border-bottom:1px solid var(--soft)}
+.grp.sub:last-child{border-bottom:0}
+.grp.sub>.grp-h{padding:9px 16px 9px 32px;background:#FAFBFC}
+.grp.sub>.grp-h:hover{background:#F1F5F9}
+.grp.sub>.grp-h .grp-name{font-size:14px;font-weight:600;letter-spacing:.01em}
+.grp.sub>.grp-h .caret{width:6px;height:6px}
+.grp.sub>.grp-body{border-top:1px solid var(--soft)}
+.grp-loose{border-top:1px solid var(--soft)}
 .grp.open .grp-body{display:block}
 
 /* ------------------------------------------------------------ board rows */
@@ -344,14 +354,20 @@ input.field{min-width:230px}
 .veil{position:fixed;inset:0;background:rgba(18,28,40,.4);opacity:0;pointer-events:none;
       transition:opacity .18s ease;z-index:60}
 .veil.on{opacity:1;pointer-events:auto}
-.panel{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--card);
+.panel{position:fixed;top:0;right:0;bottom:0;width:min(760px,100%);background:var(--card);
        border-left:1px solid var(--rule);transform:translateX(100%);transition:transform .22s ease;
        z-index:61;display:flex;flex-direction:column}
 .panel.on{transform:none}
-.panel-h{padding:18px 22px 14px;border-bottom:1px solid var(--rule);display:flex;gap:12px;align-items:flex-start}
+.ptab{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+.ptab th{text-align:left;font-weight:600;font-size:11.5px;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--muted);padding:6px 9px;border-bottom:1px solid var(--rule)}
+.ptab td{padding:8px 9px;border-bottom:1px solid var(--soft);vertical-align:top}
+.ptab tr:last-child td{border-bottom:0}
+.ptab .cust{color:var(--muted);font-weight:400}
+.panel-h{padding:20px 30px 15px;border-bottom:1px solid var(--rule);display:flex;gap:12px;align-items:flex-start}
 .panel-h h3{margin:0;font-size:19px;font-weight:600;line-height:1.25;overflow-wrap:anywhere}
-.panel-b{padding:18px 22px 26px;overflow:auto;flex:1}
-.panel-f{padding:13px 22px;border-top:1px solid var(--rule);display:flex;gap:8px;background:#FAFBFC}
+.panel-b{padding:20px 30px 30px;overflow:auto;flex:1}
+.panel-f{padding:13px 30px;border-top:1px solid var(--rule);display:flex;gap:8px;background:#FAFBFC}
 .close{margin-left:auto;border:0;background:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer;padding:0 4px}
 .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 14px;font-size:14.5px;margin-bottom:20px}
 .kv dt{color:var(--muted)}
@@ -494,7 +510,6 @@ input.field{min-width:230px}
   </nav>
 
   <section class="pane on" id="pane-boards">
-  <p class="tab-lead">Where every active board sits in the process. Click a board for its full stage table.</p>
   <div class="hero-row">
     <section class="hero">
       <h2>Where the work is sitting</h2>
@@ -507,7 +522,8 @@ input.field{min-width:230px}
 
   <div class="tools">
     <input class="field" id="q" type="search" placeholder="Search a board, customer or owner" aria-label="Search boards">
-    <select class="field" id="f-cust" aria-label="Filter by project"></select>
+    <select class="field" id="f-cust" aria-label="Filter by client"></select>
+    <select class="field" id="f-proj" aria-label="Filter by project"></select>
     <select class="field" id="f-stage" aria-label="Filter by stage"></select>
     <span class="spacer"></span>
     <span class="count" id="count"></span>
@@ -518,19 +534,14 @@ input.field{min-width:230px}
   </section>
 
   <section class="pane" id="pane-people">
-    <p class="tab-lead">Who is carrying what. Open stages only — fabrication vendors are excluded.
-       Click anyone for their task timeline.</p>
     <div class="pgrid" id="pgrid"></div>
   </section>
 
   <section class="pane" id="pane-schedule">
-    <p class="tab-lead">Every open stage placed against its EDC. The red line is today; bars that cross
-       it are running late. Stages with no EDC cannot be plotted and are listed underneath.</p>
     <div id="sched"></div>
   </section>
 
   <section class="pane" id="pane-done">
-    <p class="tab-lead">Boards with every stage closed. Click one for its stage table.</p>
     <div id="donetab"></div>
   </section>
 </main>
@@ -564,17 +575,14 @@ input.field{min-width:230px}
 
 <script>
 /* ===================================================================
-   GitHub Pages bridge.
-   PASTE YOUR APPS SCRIPT URL BETWEEN THE QUOTES ON THE NEXT LINE.
-   It must end in /exec
+   GitHub Pages bridge — Apps Script URL is already filled in below.
+   Only change it if you create a NEW deployment (not a new version).
    =================================================================== */
-var API_URL = "https://script.google.com/macros/s/AKfycbyRe7eMFA5N40nWrWVE20M3brPLW_u-UknX3uLvSUGfgDlxZbhUQD8uO4QImTFMyMTa2g/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbylTbatayRgmOTrxv757BXjmp1JoH-99Pc6JNcslWlb-Ud8L2r82LscDrFNQ7lQ6acwsw/exec";
 
-/* Everything below re-creates google.script.run using plain web requests,
-   so the rest of the dashboard code works unchanged. Do not edit it. */
+/* Re-creates google.script.run over plain web requests. Do not edit. */
 (function () {
   if (window.google && window.google.script && window.google.script.run) return;
-
   function Runner(ok, fail) {
     this._ok = ok || function () {};
     this._fail = fail || function () {};
@@ -582,37 +590,29 @@ var API_URL = "https://script.google.com/macros/s/AKfycbyRe7eMFA5N40nWrWVE20M3br
   Runner.prototype.withSuccessHandler = function (f) { return new Runner(f, this._fail); };
   Runner.prototype.withFailureHandler = function (f) { return new Runner(this._ok, f); };
   Runner.prototype.withUserObject = function () { return this; };
-
   var READS = { getBoards: 'boards', getVersion: 'version' };
-
   ['getBoards', 'getVersion', 'getLists', 'saveBoard', 'deleteBoard', 'respinBoard']
     .forEach(function (fn) {
       Runner.prototype[fn] = function (arg) {
         var self = this;
         if (!API_URL || API_URL.indexOf('PASTE_YOUR') === 0) {
-          self._fail(new Error('API_URL is not set. Edit the top of index.html.'));
-          return;
+          self._fail(new Error('API_URL is not set at the top of index.html.')); return;
         }
         var req = READS[fn]
           ? fetch(API_URL + '?api=' + READS[fn] + '&t=' + Date.now())
-          : fetch(API_URL, {
-              method: 'POST',
-              /* text/plain avoids a CORS preflight, which Apps Script cannot answer */
+          : fetch(API_URL, { method: 'POST',
               headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ fn: fn, arg: arg })
-            });
-
+              body: JSON.stringify({ fn: fn, arg: arg }) });
         req.then(function (r) { return r.json(); })
            .then(function (d) {
              if (d && d.ok === false && d.error) { self._fail(new Error(d.error)); return; }
              self._ok(d);
            })
            .catch(function (err) {
-             self._fail(new Error(err && err.message ? err.message : 'Network error. Check the API URL.'));
+             self._fail(new Error(err && err.message ? err.message : 'Could not reach the sheet.'));
            });
       };
     });
-
   window.google = window.google || {};
   window.google.script = window.google.script || {};
   window.google.script.run = new Runner();
@@ -904,6 +904,9 @@ window.PCBForm = (function () {
           '<div class="f"><label for="pf-c">Customer</label>' +
             '<input id="pf-c" list="pf-cl" value="' + esc(b.customer) + '" placeholder="Pick one, or type a new customer">' +
             '<datalist id="pf-cl">' + opts(L.customers, '') + '</datalist></div>' +
+          '<div class="f"><label for="pf-pn">Project</label>' +
+            '<input id="pf-pn" list="pf-pl" value="' + esc(b.projectName || '') + '" placeholder="Pick one, or type a new project">' +
+            '<datalist id="pf-pl">' + opts(L.projects, '') + '</datalist></div>' +
           '<div class="f"><label for="pf-m">Project manager</label>' +
             '<input id="pf-m" value="' + esc(b.manager) + '"></div>' +
           '<div class="f"><label for="pf-r">Revision or respin number</label>' +
@@ -958,6 +961,7 @@ window.PCBForm = (function () {
       return {
         project: $('pf-p').value.trim(),
         customer: $('pf-c').value.trim(),
+        projectName: $('pf-pn') ? $('pf-pn').value.trim() : '',
         manager: $('pf-m').value.trim(),
         rev: $('pf-r').value.trim(),
         holdreason: $('pf-hr') ? $('pf-hr').value : '',
@@ -1065,7 +1069,7 @@ window.PCBForm = (function () {
 
 
 <script>
-var S = { boards: [], lists: {}, ver: -1, dirty: false, tab: 'boards', people: {}, q: '', cust: '', stage: '', filter: 'active', open: {}, sel: null, mode: 'view' };
+var S = { boards: [], lists: {}, ver: -1, dirty: false, proj: '', tab: 'boards', people: {}, q: '', cust: '', stage: '', filter: 'active', open: {}, sel: null, mode: 'view' };
 
 var STAGES = PCBForm.STAGES;                       // [key, short, full] — process order
 var CLOSED = { 'Completed': 1, 'NA': 1, 'Cancelled': 1 };
@@ -1154,8 +1158,18 @@ function buildOwnerOptions(){
 
 function buildFilters(){
   var cs = Array.from(new Set(S.boards.map(function(b){ return b.customer; }))).sort();
-  $('f-cust').innerHTML = '<option value="">Every project</option>' +
+  $('f-cust').innerHTML = '<option value="">Every client</option>' +
     cs.map(function(c){ return '<option' + (c === S.cust ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('');
+
+  // projects narrow to the chosen client, so the list stays short
+  var ps = Array.from(new Set(S.boards
+    .filter(function(b){ return !S.cust || b.customer === S.cust; })
+    .map(function(b){ return (b.projectName || '').trim(); })
+    .filter(Boolean))).sort();
+  if (S.proj && ps.indexOf(S.proj) < 0) S.proj = '';
+  $('f-proj').innerHTML = '<option value="">Every project</option>' +
+    ps.map(function(p){ return '<option' + (p === S.proj ? ' selected' : '') + '>' + esc(p) + '</option>'; }).join('');
+  $('f-proj').disabled = !ps.length;
   $('f-stage').innerHTML = '<option value="">Every stage</option>' +
     STAGES.map(function(s){ return '<option value="' + s[2] + '"' + (s[2] === S.stage ? ' selected' : '') +
       '>' + esc(s[2]) + '</option>'; }).join('');
@@ -1174,9 +1188,10 @@ function visible(){
     if (S.filter === 'idle' && b.overall !== 'Not Started') return false;
     if (S.filter === 'respin' && b.respin !== 'Yes') return false;
     if (S.cust && b.customer !== S.cust) return false;
+    if (S.proj && (b.projectName || '').trim() !== S.proj) return false;
     if (S.stage && b.current !== S.stage) return false;
     if (q) {
-      var hay = [b.project, b.customer, b.manager, curComment(b)].join(' ').toLowerCase();
+      var hay = [b.project, b.projectName, b.customer, b.manager, curComment(b)].join(' ').toLowerCase();
       var owners = STAGES.map(function(s){ return (b.stages[s[0]] || {}).owner || ''; }).join(' ').toLowerCase();
       if (hay.indexOf(q) < 0 && owners.indexOf(q) < 0) return false;
     }
@@ -1241,8 +1256,7 @@ function render(){
 
   // Groups start closed. A search or a filter opens them, since a collapsed
   // group would otherwise hide the very rows you just filtered for.
-  var forced = !!(S.q || S.cust || S.stage);
-  var forced = !!(S.q || S.cust || S.stage);
+  var forced = !!(S.q || S.cust || S.proj || S.stage);
   function groupHtml(name, g, keyPrefix, openByDefault){
     var late = g.filter(lateDays).length;
     var hold = g.filter(function(b){ return b.overall === 'On Hold'; }).length;
@@ -1259,8 +1273,44 @@ function render(){
           (hold ? '<span class="tag hold">' + hold + ' on hold</span>' : '') +
           (late ? '<span class="tag late">' + late + ' past due</span>' : '') +
         '</span></button>' +
-      '<div class="grp-body">' + g.map(rowHtml).join('') + '</div>' +
+      '<div class="grp-body">' + tierHtml(g, gkey) + '</div>' +
     '</section>';
+  }
+
+  /* Client > Project > Board. Boards with no project named sit directly under
+     the client, so a half-filled Project column still renders sensibly. */
+  function tierHtml(g, gkey){
+    var byP = {}, loose = [];
+    g.forEach(function(b){
+      var p = (b.projectName || '').trim();
+      if (!p) { loose.push(b); return; }
+      (byP[p] = byP[p] || []).push(b);
+    });
+    var pnames = Object.keys(byP).sort();
+    if (!pnames.length) return g.map(rowHtml).join('');
+
+    var out = pnames.map(function(p){
+      var sub  = byP[p];
+      var skey = gkey + '::' + p;
+      var open = S.open[skey] === true || (forced && S.open[skey] !== false);
+      var late = sub.filter(lateDays).length;
+      var wip  = sub.filter(function(b){ return b.overall === 'In Progress'; }).length;
+      var hold = sub.filter(function(b){ return b.overall === 'On Hold'; }).length;
+      return '<section class="grp sub' + (open ? ' open' : '') + '" data-g="' + esc(skey) + '">' +
+        '<button class="grp-h"><span class="caret"></span>' +
+          '<span class="grp-name">' + esc(p) + '</span>' +
+          '<span class="grp-tags">' +
+            '<span class="tag">' + sub.length + ' board' + (sub.length === 1 ? '' : 's') + '</span>' +
+            (wip  ? '<span class="tag wip">'  + wip  + ' in progress</span>' : '') +
+            (hold ? '<span class="tag hold">' + hold + ' on hold</span>' : '') +
+            (late ? '<span class="tag late">' + late + ' past due</span>' : '') +
+          '</span></button>' +
+        '<div class="grp-body">' + sub.map(rowHtml).join('') + '</div>' +
+      '</section>';
+    }).join('');
+
+    if (loose.length) out += '<div class="grp-loose">' + loose.map(rowHtml).join('') + '</div>';
+    return out;
   }
 
   var html = names.map(function(name){ return groupHtml(name, by[name], 'boards', true); }).join('');
@@ -1270,10 +1320,11 @@ function render(){
   if (S.filter === 'active' || S.filter === 'all') {
     var closed = S.boards.filter(function(b){ return !isActive(b); });
     if (S.cust) closed = closed.filter(function(b){ return b.customer === S.cust; });
+    if (S.proj) closed = closed.filter(function(b){ return (b.projectName || '').trim() === S.proj; });
     if (S.q) {
       var q = S.q.toLowerCase();
       closed = closed.filter(function(b){
-        return [b.project, b.customer, b.manager, curComment(b)].join(' ').toLowerCase().indexOf(q) >= 0; });
+        return [b.project, b.projectName, b.customer, b.manager, curComment(b)].join(' ').toLowerCase().indexOf(q) >= 0; });
     }
     if (closed.length) {
       var cby = {};
@@ -1673,6 +1724,32 @@ function showTab(name){
   if (name === 'done') renderDone();
 }
 
+/**
+ * Compact table of what one person is actually carrying. Was referenced but
+ * never defined in the original build, so the person popup always failed.
+ */
+function personTable(list){
+  var rows = list.slice().sort(function(a, c){
+    return (taskLate(c) - taskLate(a)) || String(a.edc).localeCompare(String(c.edc));
+  }).map(function(t){
+    var od = taskLate(t);
+    var b  = t.board;
+    return '<tr>' +
+      '<td><b>' + esc(b.project) + '</b>' +
+        (b.projectName ? '<span class="cust"> · ' + esc(b.projectName) + '</span>' : '') +
+        '<span class="cust"> · ' + esc(b.customer) + '</span></td>' +
+      '<td>' + esc(t.stage[1]) + '</td>' +
+      '<td><span class="chip" data-s="' + esc(t.status) + '">' + esc(t.status) + '</span></td>' +
+      '<td>' + esc(t.edc || '—') + '</td>' +
+      '<td class="' + (od > 0 ? 'row-late' : '') + '">' +
+        (od > 0 ? od + 'd over' : (t.edc ? 'on time' : '—')) + '</td>' +
+    '</tr>';
+  }).join('');
+  return '<table class="ptab"><thead><tr>' +
+    '<th>Board</th><th>Stage</th><th>Status</th><th>EDC</th><th></th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
 function showPerson(name){
   var e = S.people[name];
   if (!e) return;
@@ -1680,14 +1757,14 @@ function showPerson(name){
   $('modal-title').textContent = name;
   $('modal-sub').textContent = [p.code, p.yoe != null ? p.yoe + ' yrs' : '', p.bill, p.projects]
     .filter(Boolean).join(' · ') || 'Not in the roster you supplied';
+  // Just the work: what they are on, where it is, and what is late.
+  var late = e.open.filter(function(t){ return taskLate(t) > 0; }).length;
   $('modal-b').innerHTML =
     '<div class="form">' +
-      (p.plan ? '<div class="cmt">Plan: ' + esc(p.plan) + (p.billedIn ? ' · Billed in ' + esc(p.billedIn) : '') + '</div>' : '') +
-      (p.partial ? '<div class="note">This name appears as a stage owner in the sheet but was not in the roster. ' +
-                   'Add their row so the People tab can show grade, billing and project allocation.</div>' : '') +
-      '<h4>' + e.open.length + ' open stage' + (e.open.length === 1 ? '' : 's') + '</h4>' +
-      personTable(e.open) +
-      (e.open.some(function(t){ return t.edc; }) ? gantt(e.open, false) : '') +
+      '<h4>' + e.open.length + ' open stage' + (e.open.length === 1 ? '' : 's') +
+        (late ? ' · <span class="tag late">' + late + ' past due</span>' : '') + '</h4>' +
+      (e.open.length ? personTable(e.open)
+                     : '<div class="note">Nothing open against this name right now.</div>') +
     '</div>' +
     '<div class="bar"><button class="btn" id="pm-close">Close</button></div>';
   $('pm-close').onclick = closeModal;
@@ -1723,7 +1800,8 @@ function markDone(project, stageKey){
       alert(err && err.message ? err.message : 'Could not save that. Nothing was changed.');
     })
     .saveBoard({
-      project: b.project, customer: b.customer, manager: b.manager, rev: b.rev || '',
+      project: b.project, customer: b.customer, projectName: b.projectName || '',
+      manager: b.manager, rev: b.rev || '',
       comment: b.comment || '', holdreason: b.holdreason || '', notes: b.notes || '',
       stages: stages, stamp: b.stamp || '', originalProject: b.project
     });
@@ -1834,7 +1912,8 @@ document.addEventListener('keydown', function(e){
 });
 
 $('q').addEventListener('input', function(){ S.q = this.value; render(); });
-$('f-cust').addEventListener('change', function(){ S.cust = this.value; render(); });
+$('f-cust').addEventListener('change', function(){ S.cust = this.value; S.proj = ''; render(); });
+$('f-proj').addEventListener('change', function(){ S.proj = this.value; render(); });
 $('f-stage').addEventListener('change', function(){ S.stage = this.value; render(); });
 $('btn-refresh').onclick = load;
 $('btn-add').onclick = function(){ showForm(null); };
