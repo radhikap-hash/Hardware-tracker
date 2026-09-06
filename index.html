@@ -289,9 +289,9 @@ input.field{min-width:230px}
 .grp.sub>.grp-h .caret{width:6px;height:6px}
 .grp.sub>.grp-body{border-top:1px solid var(--soft)}
 .grp-loose{border-top:1px solid var(--soft)}
-.done-sep{padding:7px 16px 7px 32px;background:#F4F6F8;border-top:1px solid var(--rule);
-  border-bottom:1px solid var(--rule);font-size:11.5px;font-weight:700;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--muted)}
+.grp.sub.done>.grp-h{background:#F4F6F8}
+.grp.sub.done>.grp-h .grp-name{color:var(--muted);font-size:12px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase}
 .grp.open > .grp-body{display:block}
 
 /* ------------------------------------------------------------ board rows */
@@ -509,7 +509,7 @@ input.field{min-width:230px}
 
 <header class="top">
   <div class="top-in">
-    <div class="mark">PCB Tracker <span class="build">BUILD 11</span> <span id="hdr-count"></span></div>
+    <div class="mark">PCB Tracker <span class="build">BUILD 12</span> <span id="hdr-count"></span></div>
     <div class="meta" id="hdr-meta">Loading…</div>
     <div class="top-act">
       <button class="btn btn-quiet" id="btn-refresh">Refresh</button>
@@ -1165,18 +1165,25 @@ function activeFirst(list){
   });
 }
 
-/* Renders a list with a divider where the closed boards begin. */
-function splitRows(list){
-  var ordered = activeFirst(list);
-  var out = '', shown = false;
-  ordered.forEach(function(b){
-    if (!isActive(b) && !shown) {
-      shown = true;
-      var k = ordered.filter(function(x){ return !isActive(x); }).length;
-      out += '<div class="done-sep">Completed &middot; ' + k + ' board' + (k === 1 ? '' : 's') + '</div>';
-    }
-    out += rowHtml(b);
-  });
+/* Active boards first, then the closed ones folded into a section you can
+   collapse. Closed work is history — it should not push live work off screen. */
+function splitRows(list, key){
+  var live = [], closed = [];
+  activeFirst(list).forEach(function(b){ (isActive(b) ? live : closed).push(b); });
+
+  var out = live.map(rowHtml).join('');
+  if (!closed.length) return out;
+
+  var dkey = (key || 'all') + '::__done';
+  var open = S.open[dkey] === true;          // closed by default
+  out += '<section class="grp sub done' + (open ? ' open' : '') + '" data-g="' + esc(dkey) + '">' +
+      '<button class="grp-h"><span class="caret"></span>' +
+        '<span class="grp-name">Completed</span>' +
+        '<span class="grp-tags"><span class="tag">' + closed.length +
+          ' board' + (closed.length === 1 ? '' : 's') + '</span></span>' +
+      '</button>' +
+      '<div class="grp-body">' + closed.map(rowHtml).join('') + '</div>' +
+    '</section>';
   return out;
 }
 
@@ -1380,7 +1387,7 @@ function render(){
       (byP[p] = byP[p] || []).push(b);
     });
     var pnames = Object.keys(byP).sort();
-    if (!pnames.length) return splitRows(g);
+    if (!pnames.length) return splitRows(g, gkey);
 
     var out = pnames.map(function(p){
       var sub  = byP[p];
@@ -1398,11 +1405,11 @@ function render(){
             (hold ? '<span class="tag hold">' + hold + ' on hold</span>' : '') +
             (late ? '<span class="tag late">' + late + ' past due</span>' : '') +
           '</span></button>' +
-        '<div class="grp-body">' + splitRows(sub) + '</div>' +
+        '<div class="grp-body">' + splitRows(sub, skey) + '</div>' +
       '</section>';
     }).join('');
 
-    if (loose.length) out += '<div class="grp-loose">' + splitRows(loose) + '</div>';
+    if (loose.length) out += '<div class="grp-loose">' + splitRows(loose, gkey + '::__loose') + '</div>';
     return out;
   }
 
