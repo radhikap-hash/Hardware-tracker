@@ -575,14 +575,38 @@ input.field{min-width:230px}
 
 <script>
 /* ===================================================================
-   GitHub Pages bridge — Apps Script URL is already filled in below.
-   Only change it if you create a NEW deployment (not a new version).
+   GitHub Pages bridge. The Apps Script URL is already filled in.
+   Change it only if you create a NEW deployment (not a new version).
    =================================================================== */
 var API_URL = "https://script.google.com/macros/s/AKfycbylTbatayRgmOTrxv757BXjmp1JoH-99Pc6JNcslWlb-Ud8L2r82LscDrFNQ7lQ6acwsw/exec";
 
-/* Re-creates google.script.run over plain web requests. Do not edit. */
+/* Recreates google.script.run over plain web requests, and explains in
+   plain English when something is misconfigured. Do not edit below. */
 (function () {
   if (window.google && window.google.script && window.google.script.run) return;
+
+  var TIMEOUT_MS = 20000;
+
+  function diagnose(text) {
+    var t = (text || '').slice(0, 4000);
+    if (/ServiceLogin|accounts\.google\.com|Sign in - Google/i.test(t)) {
+      return 'Apps Script is asking for a Google sign-in, so this page cannot read it.\n\n' +
+             'Fix: Apps Script > Deploy > Manage deployments > pencil icon > ' +
+             'set "Who has access" to Anyone > Deploy.';
+    }
+    if (/<!DOCTYPE|<html|<title>PCB Tracker/i.test(t)) {
+      return 'Apps Script returned the dashboard page instead of data, which means the ' +
+             'deployment is running an OLD version of Code.gs.\n\n' +
+             'Fix: open Apps Script, paste in the current Code.gs, press save, then ' +
+             'Deploy > Manage deployments > pencil icon > Version: New version > Deploy.';
+    }
+    if (/Script function not found|is not defined/i.test(t)) {
+      return 'Apps Script loaded but the function it needs is missing from Code.gs.\n\n' +
+             'Fix: paste in the current Code.gs, save, and redeploy a new version.';
+    }
+    return 'Apps Script replied with something that is not data:\n\n' + t.slice(0, 300);
+  }
+
   function Runner(ok, fail) {
     this._ok = ok || function () {};
     this._fail = fail || function () {};
@@ -590,29 +614,54 @@ var API_URL = "https://script.google.com/macros/s/AKfycbylTbatayRgmOTrxv757BXjmp
   Runner.prototype.withSuccessHandler = function (f) { return new Runner(f, this._fail); };
   Runner.prototype.withFailureHandler = function (f) { return new Runner(this._ok, f); };
   Runner.prototype.withUserObject = function () { return this; };
+
   var READS = { getBoards: 'boards', getVersion: 'version' };
+
   ['getBoards', 'getVersion', 'getLists', 'saveBoard', 'deleteBoard', 'respinBoard']
     .forEach(function (fn) {
       Runner.prototype[fn] = function (arg) {
-        var self = this;
+        var self = this, done = false;
+        function fail(msg) { if (!done) { done = true; self._fail(new Error(msg)); } }
+        function ok(d)      { if (!done) { done = true; self._ok(d); } }
+
         if (!API_URL || API_URL.indexOf('PASTE_YOUR') === 0) {
-          self._fail(new Error('API_URL is not set at the top of index.html.')); return;
+          fail('The Apps Script URL is missing from index.html (line with var API_URL).');
+          return;
         }
-        var req = READS[fn]
+
+        var timer = setTimeout(function () {
+          fail('Apps Script did not answer within 20 seconds. It may be waking up — try Refresh once.');
+        }, TIMEOUT_MS);
+
+        var p = READS[fn]
           ? fetch(API_URL + '?api=' + READS[fn] + '&t=' + Date.now())
-          : fetch(API_URL, { method: 'POST',
+          : fetch(API_URL, {
+              method: 'POST',
               headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ fn: fn, arg: arg }) });
-        req.then(function (r) { return r.json(); })
-           .then(function (d) {
-             if (d && d.ok === false && d.error) { self._fail(new Error(d.error)); return; }
-             self._ok(d);
-           })
-           .catch(function (err) {
-             self._fail(new Error(err && err.message ? err.message : 'Could not reach the sheet.'));
-           });
+              body: JSON.stringify({ fn: fn, arg: arg })
+            });
+
+        /* Read as TEXT first. Calling .json() straight away throws an unhelpful
+           parse error whenever Apps Script hands back a web page, which is the
+           most common misconfiguration. */
+        p.then(function (r) { return r.text(); })
+         .then(function (txt) {
+           clearTimeout(timer);
+           var d;
+           try { d = JSON.parse(txt); }
+           catch (e) { fail(diagnose(txt)); return; }
+           if (d && d.ok === false && d.error) { fail(d.error); return; }
+           ok(d);
+         })
+         .catch(function (err) {
+           clearTimeout(timer);
+           fail('Could not reach Apps Script at all. Usually this means the deployment was ' +
+                'deleted, or its access is not set to Anyone.\n\n(' +
+                (err && err.message ? err.message : 'network error') + ')');
+         });
       };
     });
+
   window.google = window.google || {};
   window.google.script = window.google.script || {};
   window.google.script.run = new Runner();
@@ -1095,9 +1144,14 @@ function load(){
   google.script.run
     .withSuccessHandler(receive)
     .withFailureHandler(function(err){
-      $('list').innerHTML = '<div class="empty"><b>Could not read the sheet</b>' +
-        esc(err && err.message ? err.message : 'Check that the COMPLETED and ACTIVE tabs still exist.') + '</div>';
+      var m = (err && err.message) ? err.message : 'Unknown error.';
+      $('list').innerHTML =
+        '<div class="empty" style="text-align:left;white-space:pre-wrap;line-height:1.55">' +
+          '<b style="display:block;margin-bottom:8px">Could not read the sheet</b>' +
+          esc(m) +
+        '</div>';
       $('hdr-meta').textContent = 'Not connected';
+      $('hdr-count').textContent = '';
     })
     .getBoards();
 }
@@ -1965,6 +2019,17 @@ function removeBoard(project){
     .withFailureHandler(function(err){ alert(err && err.message ? err.message : 'Could not delete that.'); })
     .deleteBoard({ project: project, stamp: b.stamp || '' });
 }
+
+window.addEventListener('error', function (ev) {
+  var el = document.getElementById('list');
+  if (!el || el.getAttribute('data-errored')) return;
+  el.setAttribute('data-errored', '1');
+  el.innerHTML = '<div class="empty" style="text-align:left;white-space:pre-wrap">' +
+    '<b style="display:block;margin-bottom:8px">The page hit an error</b>' +
+    esc(ev.message || String(ev.error || 'unknown')) + '</div>';
+  var hm = document.getElementById('hdr-meta');
+  if (hm) hm.textContent = 'Not connected';
+});
 
 load();
 if (!window.PRELOADED) setInterval(poll, 15000);
