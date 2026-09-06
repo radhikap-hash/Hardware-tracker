@@ -269,7 +269,7 @@ input.field{min-width:230px}
 .grp-h:hover{background:#F7F9FB}
 .caret{width:9px;height:9px;border-right:1.6px solid var(--ink2);border-bottom:1.6px solid var(--ink2);
        transform:rotate(-45deg);transition:transform .16s ease;flex:none;margin-right:2px}
-.grp.open .caret{transform:rotate(45deg)}
+.grp.open > .grp-h .caret{transform:rotate(45deg)}
 .grp-name{font-weight:600;font-size:16.5px}
 .grp-dot{width:9px;height:9px;border-radius:50%;background:var(--accent,var(--muted));flex:none}
 .grp-h:hover{background:color-mix(in srgb,var(--accent,#000) 5%,transparent)}
@@ -292,7 +292,7 @@ input.field{min-width:230px}
 .done-sep{padding:7px 16px 7px 32px;background:#F4F6F8;border-top:1px solid var(--rule);
   border-bottom:1px solid var(--rule);font-size:11.5px;font-weight:700;letter-spacing:.06em;
   text-transform:uppercase;color:var(--muted)}
-.grp.open .grp-body{display:block}
+.grp.open > .grp-body{display:block}
 
 /* ------------------------------------------------------------ board rows */
 .row{display:block;padding:15px 18px 17px;border-top:1px solid var(--soft);width:100%;
@@ -509,7 +509,7 @@ input.field{min-width:230px}
 
 <header class="top">
   <div class="top-in">
-    <div class="mark">PCB Tracker <span class="build">BUILD 10</span> <span id="hdr-count"></span></div>
+    <div class="mark">PCB Tracker <span class="build">BUILD 11</span> <span id="hdr-count"></span></div>
     <div class="meta" id="hdr-meta">Loading…</div>
     <div class="top-act">
       <button class="btn btn-quiet" id="btn-refresh">Refresh</button>
