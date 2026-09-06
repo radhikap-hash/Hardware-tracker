@@ -509,7 +509,7 @@ input.field{min-width:230px}
 
 <header class="top">
   <div class="top-in">
-    <div class="mark">PCB Tracker <span class="build">BUILD 12</span> <span id="hdr-count"></span></div>
+    <div class="mark">PCB Tracker <span class="build">BUILD 14</span> <span id="hdr-count"></span></div>
     <div class="meta" id="hdr-meta">Loading…</div>
     <div class="top-act">
       <button class="btn btn-quiet" id="btn-refresh">Refresh</button>
@@ -595,7 +595,7 @@ input.field{min-width:230px}
    GitHub Pages bridge. The Apps Script URL is already filled in.
    Change it only if you create a NEW deployment (not a new version).
    =================================================================== */
-var API_URL = "https://script.google.com/macros/s/AKfycbylTbatayRgmOTrxv757BXjmp1JoH-99Pc6JNcslWlb-Ud8L2r82LscDrFNQ7lQ6acwsw/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbz3DFbcY26uS29qKilR9hP18so4kIz1M38XEgtT8qTUqGrOvZCjmNabyTaCd89Jf_1X/exec";
 
 /* Recreates google.script.run over plain web requests, and explains in
    plain English when something is misconfigured. Do not edit below. */
@@ -1195,9 +1195,12 @@ function load(){
   google.script.run
     .withSuccessHandler(receive)
     .withFailureHandler(function(err){
-      $('list').innerHTML = '<div class="empty"><b>Could not read the sheet</b>' +
-        esc(err && err.message ? err.message : 'Check that the COMPLETED and ACTIVE tabs still exist.') + '</div>';
+      var m = (err && err.message) ? err.message : 'Check that the COMPLETED and ACTIVE tabs still exist.';
+      $('list').innerHTML =
+        '<div class="empty" style="text-align:left;white-space:pre-wrap;line-height:1.55">' +
+          '<b style="display:block;margin-bottom:8px">Could not read the sheet</b>' + esc(m) + '</div>';
       $('hdr-meta').textContent = 'Not connected';
+      $('hdr-count').textContent = '';
     })
     .getBoards();
 }
@@ -2065,6 +2068,17 @@ function removeBoard(project){
     .withFailureHandler(function(err){ alert(err && err.message ? err.message : 'Could not delete that.'); })
     .deleteBoard({ project: project, stamp: b.stamp || '' });
 }
+
+window.addEventListener('error', function (ev) {
+  var el = document.getElementById('list');
+  if (!el || el.getAttribute('data-errored')) return;
+  el.setAttribute('data-errored', '1');
+  el.innerHTML = '<div class="empty" style="text-align:left;white-space:pre-wrap">' +
+    '<b style="display:block;margin-bottom:8px">The page hit an error</b>' +
+    esc(ev.message || String(ev.error || 'unknown')) + '</div>';
+  var hm = document.getElementById('hdr-meta');
+  if (hm) hm.textContent = 'Not connected';
+});
 
 load();
 if (!window.PRELOADED) setInterval(poll, 15000);
